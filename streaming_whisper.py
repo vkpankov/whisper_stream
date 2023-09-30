@@ -92,6 +92,7 @@ class StreamingWhisperModel(WhisperModel):
                 all_tokens.extend(options.initial_prompt)
 
         last_speech_timestamp = 0.0
+
         while True:
             time_offset = seek * self.feature_extractor.time_per_frame
             audio_chunk = audio[
@@ -108,7 +109,7 @@ class StreamingWhisperModel(WhisperModel):
 
             segment_size = min(
                 self.feature_extractor.nb_max_frames,
-                len(audio_chunk) * self.feature_extractor.time_per_frame,
+                int(len(audio_chunk) * self.feature_extractor.time_per_frame),
             )
 
             segment_duration = len(audio_chunk) / self.feature_extractor.sampling_rate
