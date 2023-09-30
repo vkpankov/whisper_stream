@@ -36,7 +36,7 @@ AudioStream = NamedTuple(
 )
 
 
-class FeatureStreamingWhisperModel(WhisperModel):
+class StreamingWhisperModel(WhisperModel):
     def __detect_language(self, language, audio_segment):
         encoder_output = None
         all_language_probs = None

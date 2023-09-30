@@ -1,0 +1,1 @@
+from streaming_whisper import StreamingWhisperModel as WhisperModel
