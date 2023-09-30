@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="Whisper Streaming",
     version="1.0.0",
-    packages=["vikentii_whisper_streaming"],  # Replace with your actual package name
+    packages=find_packages(),  # Replace with your actual package name
     install_requires=[
         "faster-whisper",  # Replace with the name of your dependency
     ],
