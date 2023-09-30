@@ -6,7 +6,7 @@
 
 
 ## Possible algorithms for reducing the difference in the speed of pronunciation of source / translated text
- - Replace words in the sentence with longer or shorter synonyms, and retrieve contextually similar words using a model like Word2Vec.
+ - Replace words in the sentence with longer or shorter synonyms: retrieve contextually similar words using a model like Word2Vec.
  - Text summarization with control of output length
     - Tried https://huggingface.co/facebook/bart-large-cnn . Very low quality results (hallucinations) in case of text expansion
- - LLM: 1) finetune open-source for summarization task 2) ChatGPT API
+ - LLM: 1) finetune open-source model for summarization task 2) OpenAI API
