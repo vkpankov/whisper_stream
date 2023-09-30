@@ -3,46 +3,65 @@ import av
 import numpy as np
 
 
-def resample_ndarray(
-    arr: np.ndarray, source_sampling_rate: int, target_sampling_rate: int
-) -> np.ndarray:
-    resampler = av.audio.resampler.AudioResampler(
-        format="s16", layout="mono", rate=target_sampling_rate
-    )
-
-    if arr.dtype.kind == "f":
-        arr = (arr * 32768.0).astype(np.int16)
-
-    audio_frame = av.AudioFrame.from_ndarray(
-        arr[np.newaxis, :], format="s16", layout="mono"
-    )
-    audio_frame.sample_rate = source_sampling_rate
-
-    resampled_frame = resampler.resample(audio_frame)
-    audio = resampled_frame[0].to_ndarray().astype(np.float32) / 32768.0
-
-    return audio
+def ndarray_to_frame(arr: np.ndarray, source_sampling_rate: int) -> np.ndarray:
+    source_audio = arr[np.newaxis, :]
+    if source_audio.dtype.kind == "f":
+        source_audio = (source_audio * 32768.0).astype(np.int16)
+    arr_frame = av.AudioFrame.from_ndarray(source_audio, format="s16", layout="mono")
+    arr_frame.sample_rate = source_sampling_rate
+    return arr_frame
 
 
-def resample_ndarray_stream(
-    arr_stream: Generator, source_sr: int, target_sr: int
-) -> Generator:
+# For unified usage, converting a stream of NumPy arrays to AudioFrames
+def ndarray_to_frame_stream(arr_stream: Generator, source_sr: int) -> Generator:
     for arr in arr_stream:
-        yield resample_ndarray(arr, source_sr, target_sr)
+        yield ndarray_to_frame(arr, source_sr)
 
 
-def group_chunks_stream(audio: Generator, min_len: int):
-    chunks = []
-    total_len = 0
+class StreamSlicer:
+    def __init__(self, generator):
+        """
+        Initialize a StreamSlicer for obtaining sliced data from a stream.
+        Args:
+            generator (iterable): An iterable providing a stream of numpy arrays.
+        """
+        self.generator = generator
+        self.buffer = None
+        self.current_position = 0
 
-    for audio_chunk in audio:
-        chunks.append(audio_chunk)
-        total_len += len(audio_chunk)
+    def slice_data(self, start: int, end: int):
+        """
+        Slice data from the input stream.
 
-        if total_len >= min_len:
-            yield np.concatenate(chunks)
-            chunks = []
-            total_len = 0
+        Args:
+            start (int): The starting index of the slice.
+            end (int): The ending index of the slice.
 
-    if len(chunks) > 0:
-        yield np.concatenate(chunks)
+        Returns:
+            np.ndarray: A numpy array containing the sliced data.
+        """
+
+        self.result = []
+        overlap_data = None
+        while len(self.result) <= end - start:
+            if self.buffer is not None:
+                count_from_buffer = self.current_position - start
+                if count_from_buffer > 0:
+                    overlap_data = self.buffer[-count_from_buffer:]
+                    self.result.extend(overlap_data)
+
+            if len(self.result) < end - start:
+                try:
+                    chunk = next(self.generator)
+                    self.current_position += len(chunk)
+                except StopIteration:
+                    return np.array(self.result)
+
+                self.result.extend(chunk)
+                if overlap_data is not None:
+                    self.buffer = np.concatenate([overlap_data, chunk])
+                else:
+                    self.buffer = chunk
+            if len(self.result) >= end - start:
+                sliced_data = np.array(self.result[: end - start])
+                return sliced_data
