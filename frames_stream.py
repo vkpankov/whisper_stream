@@ -23,7 +23,7 @@ class FramesStream:
         self.av_frames = _ignore_invalid_frames(self.av_frames)
         self.av_frames = _group_frames(
             self.av_frames,
-            chunk_size,
+            4*sampling_rate,
         )
         self.resampler = av.audio.resampler.AudioResampler(
             format="s16",
@@ -35,7 +35,8 @@ class FramesStream:
         self.stream_slicer = StreamSlicer(self.stream)
 
     def __del__(self):
-        # del self.resampler
+        # Comment from faster_whisper.decode_audio: It appears that some objects related to the resampler are not freed
+        # unless the garbage collector is manually run.
         gc.collect()
 
     def _apply_resample_vad(self, input_stream, output_chunk_size):

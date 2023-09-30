@@ -1,1 +1,1 @@
-from streaming_whisper import StreamingWhisperModel as WhisperModel
+from whisper_stream.streaming_whisper import StreamingWhisperModel as WhisperModel
