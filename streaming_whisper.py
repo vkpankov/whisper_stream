@@ -73,7 +73,7 @@ class StreamingWhisperModel(WhisperModel):
     # Streaming version of generate_segments
     def stream_generate_segments(
         self,
-        audio: np.ndarray,
+        audio_stream: FramesStream,
         tokenizer: Tokenizer,
         options: TranscriptionOptions,
         encoder_output: Optional[ctranslate2.StorageView] = None,
@@ -95,7 +95,7 @@ class StreamingWhisperModel(WhisperModel):
 
         while True:
             time_offset = seek * self.feature_extractor.time_per_frame
-            audio_chunk = audio[
+            audio_chunk = audio_stream[
                 seek
                 * self.feature_extractor.hop_length : seek
                 * self.feature_extractor.hop_length
@@ -104,7 +104,7 @@ class StreamingWhisperModel(WhisperModel):
             if len(audio_chunk) < self.feature_extractor.hop_length:
                 break
 
-            features = self.feature_extractor(audio_chunk, padding=True)
+            features = self.feature_extractor(audio_chunk, padding=False)
             segment = features[:, : self.feature_extractor.nb_max_frames]
 
             segment_size = min(
@@ -277,7 +277,7 @@ class StreamingWhisperModel(WhisperModel):
                 all_tokens.extend(tokens)
                 idx += 1
 
-                yield Segment(
+                segment = Segment(
                     id=idx,
                     seek=seek,
                     start=segment["start"],
@@ -294,6 +294,15 @@ class StreamingWhisperModel(WhisperModel):
                         else None
                     ),
                 )
+                if len(audio_stream.current_speech_chunks) > 0:
+                    segment = next(
+                        restore_speech_timestamps(
+                            [segment],
+                            audio_stream.current_speech_chunks,
+                            audio_stream.sampling_rate,
+                        )
+                    )
+                yield segment
 
             if (
                 not options.condition_on_previous_text
@@ -506,14 +515,9 @@ class StreamingWhisperModel(WhisperModel):
             prepend_punctuations=prepend_punctuations,
             append_punctuations=append_punctuations,
         )
-
         segments = self.stream_generate_segments(
             audio, tokenizer, options, encoder_output
         )
-        if vad_filter and len(audio.current_speech_chunks) > 0:
-            segments = restore_speech_timestamps(
-                segments, audio.current_speech_chunks, sampling_rate
-            )
 
         info = TranscriptionInfo(
             language=language,

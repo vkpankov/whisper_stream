@@ -1,5 +1,5 @@
 from faster_whisper.feature_extractor import FeatureExtractor
-from faster_whisper.transcribe import get_speech_timestamps, collect_chunks
+from faster_whisper.transcribe import get_speech_timestamps, collect_chunks, VadOptions
 from faster_whisper.audio import _resample_frames, _ignore_invalid_frames, _group_frames
 import numpy as np
 import av
@@ -11,19 +11,22 @@ class FramesStream:
     def __init__(
         self,
         av_frames,
-        chunk_size=480000,
-        sampling_rate=16000,
-        apply_vad=False,
-        vad_parameters=None,
+        chunk_size: int = 480000,
+        sampling_rate: int = 16000,
+        apply_vad: bool = False,
+        vad_parameters: VadOptions = None,
     ) -> None:
         self.av_frames = av_frames
         self.apply_vad = apply_vad
+        if apply_vad and vad_parameters is None:
+            vad_parameters = VadOptions()
         self.vad_parameters = vad_parameters
+        self.sampling_rate = sampling_rate
         self.current_speech_chunks = []
         self.av_frames = _ignore_invalid_frames(self.av_frames)
         self.av_frames = _group_frames(
             self.av_frames,
-            4*sampling_rate,
+            chunk_size,
         )
         self.resampler = av.audio.resampler.AudioResampler(
             format="s16",
@@ -39,7 +42,7 @@ class FramesStream:
         # unless the garbage collector is manually run.
         gc.collect()
 
-    def _apply_resample_vad(self, input_stream, output_chunk_size):
+    def _apply_resample_vad(self, input_stream, output_chunk_size: int):
         """
         Generate a new stream with a different chunk size from an input stream.
 
@@ -55,11 +58,15 @@ class FramesStream:
         for frame in input_stream:
             if not isinstance(frame, np.ndarray):
                 frame = frame.to_ndarray()[0]
-
-            frame = (frame / float(np.abs(frame).max())).astype(np.float32)
+            fmax = np.abs(frame).max()
+            if fmax == 0:
+                global_pos += len(frame)
+                continue
+            frame = (frame / float(fmax)).astype(np.float32)
 
             if self.apply_vad:
                 speech_chunks = get_speech_timestamps(frame, self.vad_parameters)
+
                 origin_len = len(frame)
                 frame = collect_chunks(frame, speech_chunks)
                 for i in range(len(speech_chunks)):
