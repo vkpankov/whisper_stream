@@ -42,26 +42,22 @@ class StreamSlicer:
         """
 
         self.result = []
+
         overlap_data = None
-        while len(self.result) <= end - start:
-            if self.buffer is not None:
-                count_from_buffer = self.current_position - start
-                if count_from_buffer > 0:
-                    overlap_data = self.buffer[-count_from_buffer:]
-                    self.result.extend(overlap_data)
+        if self.buffer is not None:
+            count_from_buffer = self.current_position - start
+            if count_from_buffer > 0:
+                overlap_data = self.buffer[-count_from_buffer:]
+                self.result.extend(overlap_data)
 
-            if len(self.result) < end - start:
-                try:
-                    chunk = next(self.generator)
-                    self.current_position += len(chunk)
-                except StopIteration:
-                    return np.array(self.result)
-
+        if len(self.result) < end - start:
+            try:
+                chunk = next(self.generator)
                 self.result.extend(chunk)
-                if overlap_data is not None:
-                    self.buffer = np.concatenate([overlap_data, chunk])
-                else:
-                    self.buffer = chunk
-            if len(self.result) >= end - start:
-                sliced_data = np.array(self.result[: end - start])
-                return sliced_data
+                self.current_position += len(chunk)
+                self.buffer = chunk
+            except StopIteration:
+                pass
+
+        sliced_data = np.array(self.result[: end - start])
+        return sliced_data

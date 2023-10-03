@@ -104,7 +104,7 @@ class StreamingWhisperModel(WhisperModel):
             if len(audio_chunk) < self.feature_extractor.hop_length:
                 break
 
-            features = self.feature_extractor(audio_chunk, padding=False)
+            features = self.feature_extractor(audio_chunk, padding=True)
             segment = features[:, : self.feature_extractor.nb_max_frames]
 
             segment_size = min(

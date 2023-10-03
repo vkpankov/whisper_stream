@@ -58,11 +58,7 @@ class FramesStream:
         for frame in input_stream:
             if not isinstance(frame, np.ndarray):
                 frame = frame.to_ndarray()[0]
-            fmax = np.abs(frame).max()
-            if fmax == 0:
-                global_pos += len(frame)
-                continue
-            frame = (frame / float(fmax)).astype(np.float32)
+            frame = (frame / 32768.0).astype(np.float32)
 
             if self.apply_vad:
                 speech_chunks = get_speech_timestamps(frame, self.vad_parameters)
